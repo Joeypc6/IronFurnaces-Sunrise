@@ -1,0 +1,608 @@
+//! Iron Furnaces (Qelifern, XenoMustache, Astryxion; Apache-2.0) for Sunrise: thirteen
+//! furnaces with upgrades and augments, factories and generators, side settings, auto input and output, redstone
+//! modes, the Wireless Heat Transmitter and Receiver, the Settings Linker, the Rainbow Furnace, and the W guide.
+//! A port of BlockIronFurnaceTileBase, BlockIronFurnaceBase, the screens, containers and items of the 4.4.2 jar, written
+//! against Hooks and Parts only (no mixins, no `[[inject]]`), so it builds against the Sunrise SDK.
+//!
+//! Where things run:
+//! - the server ticks each furnace (`furnace::tick`, lent the block entity) and answers its item and energy
+//!   capabilities (`caps`), so hoppers, pipes and other mods' machines and cables reach it as the Java mod's;
+//! - right clicks, upgrades and the Settings Linker are the server's (`interact`), from what the player really holds;
+//! - the screens are drawn and clicked on the client (`screen`); the server acts on the button ids (`menu_button`)
+//!   and checks every slot through the menu (shown slots, slot rules, quick moves).
+
+mod ae2_eta;
+mod work;
+mod caps;
+mod client;
+mod config;
+mod furnace;
+mod interact;
+mod jei;
+mod owners;
+mod quickmove;
+mod recipes;
+mod screen;
+mod tooltip;
+mod util;
+
+use crate::furnace::{FURNACES, is_furnace, is_heater, is_rainbow};
+use crate::util::*;
+use mod_api::*;
+use std::collections::{HashMap, HashSet};
+use std::sync::{Mutex, OnceLock};
+
+/// What both sides keep between hooks. One mod instance serves the client and the server game, so it is behind a
+/// lock (the fork's rule: hooks are `&self + Send + Sync`).
+#[derive(Default)]
+pub(crate) struct Shared {
+    /// Server: who placed a furnace, until its block entity's first tick (setPlacedBy), by dimension and position.
+    pub placed: HashMap<(String, Pos), u128>,
+    /// Server: the furnace each player has open.
+    pub open: HashMap<u128, Pos>,
+    /// Server: a player clicked an output slot and may have taken the result (SlotIronFurnace.onTake).
+    pub taken: Vec<(u128, Pos)>,
+    /// Server: experience and recipes to give at the next server tick (player, level, recipes, points).
+    pub awards: Vec<(u128, LevelRef, Vec<String>, u32)>,
+    /// Server: results taken through the furnaces' item handler since their last tick, by dimension and position.
+    pub automation_out: HashMap<(LevelRef, Pos), i32>,
+    /// Server: screens to open again, laid out for the page they now show.
+    pub reopen: Vec<(u128, Pos, i32)>,
+    /// Both: the furnace whose screen opens next (the screen hook isn't told which block entity it is for).
+    pub layout_pos: Option<Pos>,
+    /// Server: what a furnace kept for experience, and a transmitter's energy, from its removal to its drops.
+    pub xp_on_break: HashMap<Pos, u32>,
+    pub heater_on_break: HashMap<Pos, i32>,
+    /// Server: Rainbow Furnaces a blast took apart (onExplosionHit), until their drops.
+    pub exploded: HashSet<Pos>,
+    /// Server: each furnace's comparator output, by dimension and position.
+    pub comparator: HashMap<(String, Pos), i32>,
+    /// Server: the energy a transmitter item being placed holds, by player.
+    pub placing_heater: HashMap<u128, i32>,
+    /// Client: the pointer over the open screen, from its origin.
+    pub mouse: [f32; 2],
+    /// Client: ClientShowConfig, the config tab.
+    pub config_open: bool,
+    /// Client: the Rainbow Furnace's title colours.
+    pub title_timer: u64,
+    pub title_seed: u64,
+    pub client_ticks: u64,
+}
+
+pub(crate) static STATE: Mutex<Option<Shared>> = Mutex::new(None);
+
+pub(crate) fn with_state<T>(f: impl FnOnce(&mut Shared) -> T) -> T {
+    let mut guard = STATE.lock().unwrap_or_else(|e| e.into_inner());
+    f(guard.get_or_insert_with(Shared::default))
+}
+
+/// Keys looked up at registration.
+pub(crate) struct Keys {
+    pub bucket: ItemKey,
+    pub item_heater: ItemKey,
+    pub heater: ItemKey,
+    pub million: ItemKey,
+    pub rainbow_coal: ItemKey,
+    pub moved: ItemKey,
+    pub augments: [(ItemKey, usize); 6],
+    pub smoke: ParticleKey,
+    pub flame: ParticleKey,
+    pub crit: ParticleKey,
+}
+
+pub(crate) static KEYS: OnceLock<Keys> = OnceLock::new();
+
+#[derive(Default)]
+struct Mod;
+
+/// The furnaces' Part: their blocks and block entities.
+pub(crate) struct Furnace;
+/// The Wireless Heat Transmitter's Part.
+pub(crate) struct Heater;
+/// The upgrades' and the Settings Linker's Part (their useOn).
+pub(crate) struct Tool;
+/// The transmitter's item: its stored energy's bar, and the energy it places with.
+pub(crate) struct HeaterItem;
+/// The shift-click stand-in (`quickmove`): gone wherever it is seen.
+pub(crate) struct StandIn;
+/// The menus' slot rules.
+pub(crate) struct Menus;
+
+const UPGRADES: [&str; 16] = [
+    "upgrade_iron", "upgrade_gold", "upgrade_diamond", "upgrade_emerald", "upgrade_obsidian", "upgrade_crystal",
+    "upgrade_obsidian2", "upgrade_netherite", "upgrade_copper", "upgrade_silver", "upgrade_silver2", "upgrade_iron2",
+    "upgrade_gold2", "upgrade_allthemodium", "upgrade_vibranium", "upgrade_unobtainium",
+];
+
+#[mod_api::sunrise_mod]
+impl Hooks for Mod {
+    fn register(&self, r: &mut dyn Registrar, _cx: &RegistrationContext) {
+        // The generators' recipes, read with `recipes_of_type`: Sunrise refuses a recipe file whose serializer no mod
+        // registered, so the type and its serializer (the files' `type`, the same id) are declared here.
+        r.register_recipe_type("ironfurnaces:generator_blasting");
+        r.register_raw_recipe_serializer("ironfurnaces:generator_blasting", "ironfurnaces:generator_blasting");
+        let furnaces = r.block_entity_type("furnace").blocks(&FURNACES).build();
+        r.block_entity_part(&furnaces, Furnace).expect("ironfurnaces:furnace is a native block entity type");
+        let heater = r.block_entity_type("heater").blocks(&["ironfurnaces:heater"]).build();
+        r.block_entity_part(&heater, Heater).expect("ironfurnaces:heater is a native block entity type");
+        r.block_entity_capability_before_game(&ITEMS, &furnaces, |_, at| Some(Box::new(caps::FurnaceItems(at))));
+        r.block_entity_capability_before_game(&ENERGY, &furnaces, |_, at| Some(Box::new(caps::FurnaceEnergy(at))));
+        // With the Machine Work library installed: the furnaces' progress and craft times through its shared capability
+        // (AE2's crafting ETA, Jade, recipe viewers read it), `work.rs`.
+        #[cfg(feature = "machine_work")]
+        if _cx.mods().get("machine_work").is_some() {
+            r.block_entity_capability(&machine_work::MACHINE_WORK, &furnaces, |_, at| {
+                Some(Box::new(work::FurnaceWork(at)) as Box<dyn machine_work::MachineWork>)
+            });
+        }
+        r.menu_part("ironfurnaces:furnace", Menus);
+        r.menu_part("ironfurnaces:heater", Menus);
+        for name in UPGRADES.iter().chain(&["item_copy"]) {
+            let key = r.item_key(&format!("ironfurnaces:{name}"));
+            r.item_part(key, Tool);
+        }
+        let moved = r.item_key("ironfurnaces:moved");
+        r.item_part(moved, StandIn);
+        let heater_item = r.item_key("ironfurnaces:heater");
+        r.item_part(heater_item, HeaterItem);
+        let mut augment = |id: &str, slot| (r.item_key(id), slot);
+        let augments = [
+            augment("ironfurnaces:augment_blasting", furnace::AUGMENT_RED),
+            augment("ironfurnaces:augment_smoking", furnace::AUGMENT_RED),
+            augment("ironfurnaces:augment_speed", furnace::AUGMENT_GREEN),
+            augment("ironfurnaces:augment_fuel", furnace::AUGMENT_GREEN),
+            augment("ironfurnaces:augment_factory", furnace::AUGMENT_BLUE),
+            augment("ironfurnaces:augment_generator", furnace::AUGMENT_BLUE),
+        ];
+        let keys = Keys {
+            bucket: r.item_key("minecraft:bucket"),
+            item_heater: r.item_key("ironfurnaces:item_heater"),
+            heater: heater_item,
+            million: r.item_key("ironfurnaces:million_furnace"),
+            rainbow_coal: r.item_key("ironfurnaces:rainbow_coal"),
+            moved: r.item_key("ironfurnaces:moved"),
+            augments,
+            smoke: r.particle_key("minecraft:smoke"),
+            flame: r.particle_key("minecraft:flame"),
+            crit: r.particle_key("minecraft:crit"),
+        };
+        let _ = KEYS.set(keys);
+
+        // The game's own answer for the slots; hoppers and pipes go through `caps::FurnaceItems`, which answers
+        // first with the furnace's side settings.
+        let all: Vec<usize> = (0..furnace::SLOTS).collect();
+        for id in FURNACES {
+            let block = r.block_key(id);
+            r.block_container(
+                &block,
+                ModContainer {
+                    slots: furnace::SLOTS,
+                    faces: std::array::from_fn(|_| all.clone()),
+                    inputs: vec![0, 1, 6, 7, 8, 9, 10, 11, 12],
+                    outputs: vec![1, 2, 6, 13, 14, 15, 16, 17, 18],
+                    menu: Some("ironfurnaces:furnace".to_owned()),
+                },
+            );
+        }
+        let heater_block = r.block_key("ironfurnaces:heater");
+        r.block_container(
+            &heater_block,
+            ModContainer {
+                slots: 1,
+                faces: std::array::from_fn(|_| Vec::new()),
+                inputs: Vec::new(),
+                outputs: Vec::new(),
+                menu: Some("ironfurnaces:heater".to_owned()),
+            },
+        );
+        // The transmitter's FEnergyStorage(1000000, 1000000, 0): it takes power from any side and gives none. (The
+        // furnaces' energy is `caps::FurnaceEnergy`, which follows their mode.)
+        r.block_energy(
+            &heater_block,
+            ModEnergyBuffer {
+                capacity: 1_000_000,
+                max_insert: 1_000_000,
+                max_extract: 0,
+                insert_faces: [true; 6],
+                extract_faces: [false; 6],
+            },
+        );
+    }
+
+    fn player_inventory_changed(&self, host: &mut dyn ServerHost, event: &mut PlayerInventoryChangedEvent<'_>) {
+        if event.stacks.iter().flatten().any(quickmove::is_marked) {
+            quickmove::sweep(host, event.player, event.stacks);
+        }
+    }
+
+    fn entity_join_level(&self, host: &mut dyn ServerHost, event: &mut EntityJoinLevelEvent<'_>) -> Flow {
+        // A shift-click's stand-in never enters the world as a dropped item (a toss, a death, a full inventory).
+        let place = ItemPlace::ItemEntity { id: event.entity };
+        if event.kind == "minecraft:item" && place.stack(host).is_some_and(|s| quickmove::is_marked(&s)) {
+            return Flow::Cancel;
+        }
+        Flow::Continue
+    }
+
+    fn hopper_pickup_item(&self, _level: &dyn LevelHost, event: &mut HopperPickupItemEvent<'_>) -> Flow {
+        if event.item == quickmove::MOVED { Flow::Cancel } else { Flow::Continue }
+    }
+
+    fn item_toss(&self, host: &mut dyn ServerHost, event: &mut ItemTossEvent) -> Flow {
+        // The toss now names the item entity, not the item: a stand-in's stack is never tossed.
+        if event.item.stack(&*host).is_some_and(|s| quickmove::is_marked(&s)) { Flow::Cancel } else { Flow::Continue }
+    }
+
+    fn player_container_close(&self, _host: &mut dyn ServerHost, event: &mut PlayerContainerCloseEvent<'_>) {
+        let player = event.player;
+        with_state(|s| {
+            s.open.remove(&player);
+        });
+    }
+
+    /// With AE2 installed: the furnaces' craft times for its crafting jobs' time left (`ae2_eta`).
+    fn server_starting(&self, host: &mut dyn ServerHost, _event: &mut ServerStartingEvent) {
+        mod_api::if_installed!(host, ae2, {
+            ae2::api::register_machine(crate::ae2_eta::machine_time);
+        });
+    }
+
+    fn server_tick(&self, host: &mut dyn ServerHost, _event: &mut ServerTickEvent<'_>) {
+        furnace::give_awards(host);
+        interact::reopen_pending(host);
+    }
+
+    fn tags_updated(&self, _host: HostSide, _event: &mut TagsUpdatedEvent) {
+        recipes::forget();
+    }
+
+    fn right_click_block(&self, host: HostSide, event: &mut RightClickBlockEvent<'_>) -> Flow {
+        // The client's screen hook is told only the block: the furnace clicked is the one whose screen opens.
+        if let HostSide::Client(host) = host
+            && let Some(level) = host.level(host.dimension())
+            && let Some(block) = level.block(&*host, event.click.pos).map(|b| b.id(&*host))
+            && (is_furnace(&block) || is_heater(&block))
+        {
+            let pos = event.click.pos;
+            with_state(|s| s.layout_pos = Some(pos));
+        }
+        Flow::Continue
+    }
+
+    fn entity_place(&self, host: &mut dyn ServerHost, event: &mut EntityPlaceEvent) -> Flow {
+        let Some(placer) = event.placer.and_then(|e| e.uuid(host)) else { return Flow::Continue };
+        let pos = [event.pos.x, event.pos.y, event.pos.z];
+        let Some(block) = host.block_state_string(event.state) else { return Flow::Continue };
+        let block = block.split('[').next().unwrap_or("").to_owned();
+        if is_furnace(&block) {
+            let dimension = host.dimension().to_owned();
+            with_state(|s| s.placed.insert((dimension, pos), placer));
+        } else if is_heater(&block) {
+            // setPlacedBy: the energy the item held.
+            let energy = with_state(|s| s.placing_heater.remove(&placer)).unwrap_or(0);
+            if energy > 0
+                && let Some(level) = host.level(host.dimension())
+                && let Some(entity) = host.block_entity(level, pos)
+            {
+                let mut c = Compound::new();
+                set_i(&mut c, "energy", energy.min(1_000_000));
+                let _ = entity.merge_data(host, c);
+            }
+        }
+        Flow::Continue
+    }
+
+    fn block_drops(&self, level: &dyn LevelHost, event: &mut BlockDropsEvent<'_>) -> Flow {
+        let pos = [event.pos.x, event.pos.y, event.pos.z];
+        let Some(block) = level.state_block(event.state).map(str::to_owned) else { return Flow::Continue };
+        let Some(keys) = KEYS.get() else { return Flow::Continue };
+        if is_furnace(&block) {
+            // onBlockStateChange: grantStoredRecipeExperience where it stood.
+            let xp = with_state(|s| s.xp_on_break.remove(&pos)).unwrap_or(0);
+            event.experience += xp;
+            if is_rainbow(&block) && with_state(|s| s.exploded.remove(&pos)) {
+                // onExplosionHit: the block itself is gone, not dropped.
+                event.drops.retain(|d| d.stack.item() != keys.million);
+            }
+        } else if is_heater(&block) {
+            let energy = with_state(|s| s.heater_on_break.remove(&pos)).unwrap_or(0);
+            // onDestroyedByPlayer: a transmitter broken by a player (not in creative: no drops then) comes back with
+            // its energy. Its loot table drops nothing.
+            if event.breaker.is_some()
+                && let Some(mut stack) = ItemStack::new(keys.heater, 1)
+            {
+                if energy > 0 {
+                    let mut c = Compound::new();
+                    set_i(&mut c, "Energy", energy);
+                    set_custom_data(&mut stack, c);
+                }
+                event.drops.push(ItemDrop::new(stack, centre(pos), [0.0; 3], 10));
+            }
+        }
+        Flow::Continue
+    }
+
+    fn item_tooltip(&self, host: &dyn ClientHost, event: &mut ItemTooltipEvent<'_>) {
+        tooltip::tooltip(host, event.stack, event.lines);
+    }
+
+    fn client_player_logging_in(&self, host: &mut dyn ClientHost, _event: &mut ClientPlayerLoggingInEvent) {
+        mod_api::if_installed!(host, jei, {
+            crate::jei::register(&*host);
+        });
+    }
+
+    fn client_tick_post(&self, host: &mut dyn ClientHost, _event: &mut ClientTickPostEvent) {
+        client::tick(host);
+    }
+}
+
+#[mod_api::sunrise_part]
+impl BlockPart for Furnace {
+    /// `misc.lightupdates` (the Java mod's light_state mixin): when set, a lit furnace gives no light, so lighting
+    /// isn't recalculated each time one lights or goes out. Otherwise its `state_light` (14 lit) stands.
+    fn light_emission(&self, host: &dyn Host, _event: &mut LightEmissionEvent) -> Option<u8> {
+        (config::cfg(host, "misc.lightupdates") != 0).then_some(0)
+    }
+
+    fn use_item_on(&self, host: &mut dyn ServerHost, event: &mut UseItemOnEvent<'_>) -> Option<InteractionResult> {
+        interact::use_item_on(host, event.click)
+    }
+
+    fn use_without_item(&self, host: &mut dyn ServerHost, event: &mut UseWithoutItemEvent<'_>) -> Option<InteractionResult> {
+        interact::use_without_item(host, event.click)
+    }
+
+    fn state_for_placement(&self, level: &dyn LevelHost, event: &mut StateForPlacementEvent<'_>) -> Option<Option<BlockState>> {
+        // getStateForPlacement: facing the player.
+        let facing = interact::facing_for(event.context.yaw);
+        level.state_with_property(event.state, "facing", facing).map(Some)
+    }
+
+    fn has_analog_output(&self, _level: &dyn LevelHost, event: &mut HasAnalogOutputEvent) {
+        event.output = true;
+    }
+
+    fn analog_output(&self, _level: &dyn LevelHost, event: &mut AnalogOutputEvent) {
+        let key = (event.dimension.key().id().to_owned(), [event.pos.x, event.pos.y, event.pos.z]);
+        event.output = with_state(|s| s.comparator.get(&key).copied()).unwrap_or(0);
+    }
+
+    fn on_block_exploded(&self, host: &mut dyn ServerHost, event: &mut OnBlockExplodedEvent<'_>) {
+        let pos = [event.pos.x, event.pos.y, event.pos.z];
+        let Some(level) = host.level(host.dimension()) else { return };
+        if !level.block(host, pos).is_some_and(|b| is_rainbow(&b.id(host))) {
+            return;
+        }
+        // BlockMillionFurnace.onExplosionHit: a Rainbow Coal two blocks up, the furnace gone.
+        with_state(|s| s.exploded.insert(pos));
+        if let Some(coal) = KEYS.get().and_then(|k| ItemStack::new(k.rainbow_coal, 1)) {
+            let _ = level.spawn_item(host, f64::from(pos[0]), f64::from(pos[1]) + 2.0, f64::from(pos[2]), coal, 10);
+        }
+    }
+}
+
+#[mod_api::sunrise_part]
+impl BlockEntityPart for Furnace {
+    fn block_entity(&self, _level: LevelSide, _event: &mut BlockEntityEvent<'_>) -> Option<Compound> {
+        Some(Compound::new())
+    }
+
+    fn block_entity_ticks(&self, _host: &dyn Host, event: &mut BlockEntityTicksEvent<'_>) {
+        event.ticks = true;
+    }
+
+    fn block_entity_tick(&self, host: &mut dyn ServerHost, event: &mut BlockEntityTickEvent<'_>) {
+        // (The entity's id is its type, `ironfurnaces:furnace`: the tier is the block's.)
+        let pos = event.pos;
+        let Some(block) = host.level(host.dimension()).and_then(|l| l.block(host, pos)).map(|b| b.id(host)) else { return };
+        furnace::tick(host, pos, &block, &mut event.entity);
+        client::comparator(host, pos, &block, &event.entity);
+    }
+
+    fn block_entity_update_tag(&self, event: &mut BlockEntityUpdateTagEvent<'_>) -> Option<Compound> {
+        // What the client's copy needs: the page and mode its screen lays out, the look.
+        let mut tag = Compound::new();
+        for key in ["hz_mode", "AugmentGUI", "Jovial"] {
+            if let Some(v) = event.entity.nbt.get(&java(key)) {
+                tag.insert(java(key), v.clone());
+            }
+        }
+        Some(tag)
+    }
+
+    fn screen(&self, host: &dyn Host, event: &mut ScreenEvent<'_>) -> Option<Screen> {
+        screen::layout(host, event.block)
+    }
+
+    fn screen_draw(&self, host: &dyn ClientHost, event: &mut ScreenDrawEvent<'_>) {
+        screen::draw(host, event.block, event.data, event.draw, event.origin);
+    }
+
+    fn screen_click(&self, host: &dyn ClientHost, event: &mut ScreenClickEvent<'_>) -> Option<i32> {
+        screen::click(host, event.block, event.data, event.at, event.right)
+    }
+
+    fn screen_tooltip(&self, host: &dyn ClientHost, event: &mut ScreenTooltipEvent<'_>) {
+        screen::tooltip(host, event.block, event.data, event.at, event.lines);
+    }
+
+    fn menu_button(&self, host: &mut dyn ServerHost, event: &mut MenuButtonEvent<'_>) {
+        screen::menu_button(host, event.context.player, event.context.pos, event.context.id, &mut event.entity.nbt);
+    }
+
+    fn menu_quick_move(&self, host: &mut dyn ServerHost, event: &mut MenuQuickMoveEvent<'_>) -> Flow {
+        // quickMoveStack from the player's inventory (`quickmove`); from the furnace's slots, the game's routing (into
+        // the inventory, the results from its end) is the Java menu's.
+        let Some(player) = host.players().acting_player().and_then(|p| p.entity().uuid(host)) else { return Flow::Continue };
+        let Some(level) = host.level(host.dimension()) else { return Flow::Continue };
+        let Some(block) = level.block(host, event.pos).map(|b| b.id(host)) else { return Flow::Continue };
+        // An empty slot: nothing to move.
+        let Some(stack) = event.stack.as_mut() else { return Flow::Continue };
+        if quickmove::run(host, player, level, &block, &mut event.entity, event.slot, stack) { Flow::Cancel } else { Flow::Continue }
+    }
+
+    fn pre_remove_side_effects(&self, _level: &mut dyn LevelRandomHost, event: &mut PreRemoveSideEffectsEvent<'_>) {
+        let pos = [event.pos.x, event.pos.y, event.pos.z];
+        let xp = furnace::stored_experience(&event.entity.nbt);
+        with_state(|s| {
+            s.xp_on_break.insert(pos, xp);
+            s.comparator.retain(|(_, p), _| *p != pos);
+        });
+    }
+
+    /// A lit furnace's flames, smoke and sounds run on the client, for every loaded copy (`client::animate`).
+    fn block_entity_client_ticks(&self, _host: &dyn ClientHost, event: &mut BlockEntityClientTicksEvent<'_>) {
+        event.ticks = true;
+    }
+
+    fn block_entity_client_tick(&self, host: &mut dyn ClientHost, event: &mut BlockEntityClientTickEvent<'_>) {
+        client::animate(host, event.pos);
+    }
+}
+
+#[mod_api::sunrise_part]
+impl BlockPart for Heater {
+    fn use_without_item(&self, host: &mut dyn ServerHost, event: &mut UseWithoutItemEvent<'_>) -> Option<InteractionResult> {
+        interact::heater_use(host, event.click)
+    }
+}
+
+#[mod_api::sunrise_part]
+impl BlockEntityPart for Heater {
+    fn block_entity(&self, _level: LevelSide, _event: &mut BlockEntityEvent<'_>) -> Option<Compound> {
+        Some(Compound::new())
+    }
+
+    fn block_entity_ticks(&self, _host: &dyn Host, event: &mut BlockEntityTicksEvent<'_>) {
+        event.ticks = true;
+    }
+
+    fn block_entity_tick(&self, _host: &mut dyn ServerHost, event: &mut BlockEntityTickEvent<'_>) {
+        furnace::heater_tick(event.pos, &mut event.entity);
+    }
+
+    fn screen(&self, host: &dyn Host, event: &mut ScreenEvent<'_>) -> Option<Screen> {
+        screen::layout(host, event.block)
+    }
+
+    fn screen_draw(&self, host: &dyn ClientHost, event: &mut ScreenDrawEvent<'_>) {
+        screen::draw(host, event.block, event.data, event.draw, event.origin);
+    }
+
+    fn screen_tooltip(&self, host: &dyn ClientHost, event: &mut ScreenTooltipEvent<'_>) {
+        screen::tooltip(host, event.block, event.data, event.at, event.lines);
+    }
+
+    fn pre_remove_side_effects(&self, _level: &mut dyn LevelRandomHost, event: &mut PreRemoveSideEffectsEvent<'_>) {
+        let pos = [event.pos.x, event.pos.y, event.pos.z];
+        let energy = get_i(&event.entity.nbt, "energy", 0);
+        with_state(|s| s.heater_on_break.insert(pos, energy));
+    }
+}
+
+#[mod_api::sunrise_part]
+impl ItemPart for Tool {
+    fn use_on(&self, host: HostSide, event: &mut UseOnEvent<'_>) -> Option<InteractionResult> {
+        // Server-side as before: a claimed use swings the hand and neither the item's `useOn` nor its `use` runs.
+        let HostSide::Server(host) = host else { return None };
+        matches!(interact::item_use_on(host, event), Flow::Cancel).then_some(InteractionResult::SuccessServer)
+    }
+}
+
+#[mod_api::sunrise_part]
+impl ItemPart for HeaterItem {
+    fn use_on(&self, host: HostSide, event: &mut UseOnEvent<'_>) -> Option<InteractionResult> {
+        let HostSide::Server(_) = host else { return None };
+        // The energy it holds goes to the transmitter it places (`entity_place`).
+        let energy = tooltip::heater_energy(event.stack).unwrap_or(0);
+        let player = event.player;
+        with_state(|s| s.placing_heater.insert(player, energy));
+        None
+    }
+
+    fn item_bar(&self, _host: &dyn ClientHost, event: &mut ItemBarEvent<'_>) {
+        // BlockItemHeater: isBarVisible with energy, 13 pixels for a full store, getBarColor -8387072.
+        if let Some(energy) = tooltip::heater_energy(event.stack) {
+            *event.bar = Some(((13.0 * (f64::from(energy) / 1_000_000.0)) as i32, (-8_387_072i32) as u32));
+        }
+    }
+}
+
+#[mod_api::sunrise_part]
+impl ItemPart for StandIn {
+    fn inventory_tick(&self, host: &mut dyn ServerHost, event: &mut InventoryTickEvent<'_>) {
+        // (After the inventory check took it, nothing is left here; this is for a stand-in that got past it.)
+        let Some(player) = host.players().acting_player().and_then(|p| p.entity().uuid(host)) else { return };
+        let place = ItemPlace::PlayerSlot { player, slot: event.slot };
+        let resource = ItemResource::of(event.stack);
+        let count = event.stack.count();
+        let _ = host.transaction(|host, tx| match place.extract(host, tx, &resource, count) {
+            n if n == count => Ok(()),
+            _ => Err(()),
+        });
+    }
+
+    fn on_entity_item_update(&self, host: &mut dyn ServerHost, event: &mut OnEntityItemUpdateEvent<'_>) -> Flow {
+        let _ = event.item.entity().discard(host);
+        Flow::Cancel
+    }
+}
+
+#[mod_api::sunrise_part]
+impl MenuPart for Menus {
+    fn menu_slot_rules(&self, _host: &dyn Host, event: &mut MenuSlotRulesEvent<'_>) {
+        let Some(keys) = KEYS.get() else { return };
+        if event.container != MenuContainer::Main {
+            return;
+        }
+        let item = event.stack.item();
+        if event.menu == "ironfurnaces:heater" {
+            // SlotHeater: only a receiver.
+            event.may_place = item == keys.item_heater;
+            return;
+        }
+        if event.menu != "ironfurnaces:furnace" {
+            return;
+        }
+        let augment = keys.augments.iter().find(|(k, _)| *k == item).map(|(_, slot)| *slot);
+        // The red augment in the menu (the furnace's recipe type, the generator's fuel), as the Java slots read the
+        // block entity's slot 3.
+        let red = event.context.slot(MenuContainer::Main, furnace::AUGMENT_RED).map(ItemStack::item);
+        let red = recipes::red_augment(red, keys.augments[0].0, keys.augments[1].0);
+        // What an item is, worked out when the data packs loaded; until then nothing is held back.
+        let sets = recipes::sets();
+        let is = |set: fn(&recipes::ItemSets) -> &std::collections::HashSet<ItemKey>| sets.as_ref().is_none_or(|s| set(s).contains(&item));
+        match event.slot {
+            // SlotIronFurnaceInput and SlotIronFurnaceInputFactory: hasRecipe, of the furnace's own type.
+            furnace::INPUT | 7..=12 => {
+                event.may_place = sets.as_ref().is_none_or(|s| s.cookable[red.kind().index()].contains(&item));
+            }
+            // SlotIronFurnaceFuel: a fuel (a receiver too), or a bucket, one at a time.
+            furnace::FUEL => {
+                if item == keys.bucket {
+                    event.max_stack = 1;
+                } else {
+                    event.may_place = item == keys.item_heater || is(|s| &s.fuel);
+                }
+            }
+            // SlotIronFurnace and SlotIronFurnaceOutputFactory: results only come out.
+            furnace::OUTPUT | 13..=18 => event.may_place = false,
+            // The augment slots: their colour's augment, one.
+            furnace::AUGMENT_RED..=furnace::AUGMENT_BLUE => {
+                event.may_place = augment == Some(event.slot);
+                event.max_stack = 1;
+            }
+            // SlotIronFurnaceInputGenerator: by the red augment, a generator_blasting recipe's item, a food, or a
+            // fuel that is no receiver.
+            furnace::GENERATOR_FUEL => {
+                event.may_place = match red {
+                    recipes::Red::Blasting => is(|s| &s.generator),
+                    recipes::Red::Smoking => is(|s| &s.food),
+                    recipes::Red::None => item != keys.item_heater && is(|s| &s.fuel),
+                };
+            }
+            _ => {}
+        }
+    }
+}

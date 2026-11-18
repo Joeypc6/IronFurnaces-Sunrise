@@ -1,0 +1,49 @@
+{
+  "items": {
+    "ironfurnaces:iron_furnace": "furnaces.md",
+    "ironfurnaces:copper_furnace": "furnaces.md",
+    "ironfurnaces:silver_furnace": "furnaces.md",
+    "ironfurnaces:gold_furnace": "furnaces.md",
+    "ironfurnaces:diamond_furnace": "furnaces.md",
+    "ironfurnaces:emerald_furnace": "furnaces.md",
+    "ironfurnaces:crystal_furnace": "furnaces.md",
+    "ironfurnaces:obsidian_furnace": "furnaces.md",
+    "ironfurnaces:netherite_furnace": "furnaces.md",
+    "ironfurnaces:allthemodium_furnace": "furnaces.md",
+    "ironfurnaces:vibranium_furnace": "furnaces.md",
+    "ironfurnaces:unobtainium_furnace": "furnaces.md",
+    "ironfurnaces:augment_blasting": "augments.md",
+    "ironfurnaces:augment_smoking": "augments.md",
+    "ironfurnaces:augment_speed": "augments.md",
+    "ironfurnaces:augment_fuel": "augments.md",
+    "ironfurnaces:augment_factory": "augments.md",
+    "ironfurnaces:augment_generator": "augments.md",
+    "ironfurnaces:million_furnace": "rainbow.md",
+    "ironfurnaces:rainbow_core": "rainbow.md",
+    "ironfurnaces:rainbow_plating": "rainbow.md",
+    "ironfurnaces:rainbow_coal": "rainbow.md",
+    "ironfurnaces:heater": "rainbow.md",
+    "ironfurnaces:item_heater": "rainbow.md"
+  },
+  "titles": {
+    "furnaces.md": "Iron Furnaces",
+    "augments.md": "Augments",
+    "rainbow.md": "Rainbow Furnace"
+  },
+  "parents": {
+    "augments.md": "furnaces.md",
+    "rainbow.md": "furnaces.md"
+  },
+  "positions": {
+    "furnaces.md": "0",
+    "augments.md": "10",
+    "rainbow.md": "20"
+  },
+  "icons": {
+    "furnaces.md": "ironfurnaces:iron_furnace",
+    "augments.md": "ironfurnaces:augment_blasting",
+    "rainbow.md": "ironfurnaces:million_furnace"
+  },
+  "categories": {},
+  "requires": {}
+}

@@ -1,0 +1,56 @@
+{
+  "template": "minecraft:diamond_block",
+  "properties": {
+    "hardness": 3.0,
+    "explosion_resistance": 6.0,
+    "sounds": "minecraft:diamond_block",
+    "requires_tool": true,
+    "dynamic_light": true
+  },
+  "state_properties": {
+    "lit": {
+      "type": "boolean"
+    },
+    "facing": {
+      "type": "enum",
+      "values": [
+        "north",
+        "south",
+        "west",
+        "east"
+      ]
+    },
+    "jovial": {
+      "type": "enum",
+      "values": [
+        "0",
+        "1",
+        "2"
+      ]
+    },
+    "type": {
+      "type": "enum",
+      "values": [
+        "0",
+        "1",
+        "2"
+      ]
+    }
+  },
+  "default_state": {
+    "facing": "north",
+    "jovial": "0",
+    "lit": "false",
+    "type": "0"
+  },
+  "state_light": {
+    "properties": [
+      "lit"
+    ],
+    "values": {
+      "true": 14,
+      "false": 0
+    },
+    "default": 0
+  }
+}

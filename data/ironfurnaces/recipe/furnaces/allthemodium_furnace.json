@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "B#B",
+    "#X#",
+    "B#B"
+  ],
+  "key": {
+    "#": "#c:ingots/allthemodium",
+    "X": "#c:furnaces/netherite",
+    "B": "#ironfurnaces:allthemodium_corners"
+  },
+  "result": {
+    "id": "ironfurnaces:allthemodium_furnace"
+  }
+}

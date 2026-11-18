@@ -1,0 +1,23 @@
+id = "ironfurnaces"
+name = "Iron Furnaces"
+version = "4.4.5"
+description = "Furnaces of every metal, with augments, factories and generators. A port of Iron Furnaces (Qelifern, XenoMustache, Astryxion; Apache-2.0) to Sunrise's mod API."
+authors = ["Qelifern (pizzaatime)", "XenoMustache", "Astryxion", "Sunrise port: Joeypc6"]
+api = "0.2"
+side = "both"
+capabilities = ["registries"]
+
+[dependencies]
+# The W guide (pages in assets/ironfurnaces/ae2guide) and the recipe viewer's generator categories, when installed.
+guideme = { version = "^0.1", optional = true }
+jei = { version = "^0.5", optional = true }
+# Applied Energistics 2's crafting ETA: the furnaces' craft times (`ae2::api::register_machine`, src/ae2_eta.rs).
+ae2 = { version = "^15.4.13", optional = true }
+# The shared machine-progress capability (machine_work::MACHINE_WORK, src/work.rs): AE2's crafting ETA asks it first.
+machine_work = { version = "^0.1", optional = true }
+
+[native]
+game = "26.3"
+# Pinned to Sunrise Nightly 2026-11-17 (2d81263) until the first release publishes an SDK.
+sunrise = "2d8126336e579777eabf9b2fd8b3d476236a04f2"
+mixins = "5a64af938ec86b00d53d16a408aabc0038fb3e57"
