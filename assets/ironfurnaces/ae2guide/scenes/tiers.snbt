@@ -1,0 +1,35 @@
+{
+  DataVersion: 4325,
+  size: [5, 2, 2],
+  palette: [
+    {Name:"ironfurnaces:copper_furnace",Properties:{facing:"south",lit:"true"}},
+    {Name:"ironfurnaces:iron_furnace",Properties:{facing:"south",lit:"true"}},
+    {Name:"ironfurnaces:silver_furnace",Properties:{facing:"south",lit:"true"}},
+    {Name:"ironfurnaces:gold_furnace",Properties:{facing:"south",lit:"true"}},
+    {Name:"ironfurnaces:diamond_furnace",Properties:{facing:"south",lit:"true"}},
+    {Name:"ironfurnaces:emerald_furnace",Properties:{facing:"south",lit:"true"}},
+    {Name:"ironfurnaces:crystal_furnace",Properties:{facing:"south",lit:"true"}},
+    {Name:"ironfurnaces:obsidian_furnace",Properties:{facing:"south",lit:"true"}},
+    {Name:"ironfurnaces:netherite_furnace",Properties:{facing:"south",lit:"true"}},
+    {Name:"minecraft:stone"},
+    {Name:"ironfurnaces:million_furnace",Properties:{facing:"south",lit:"true",rainbow:"false"}}
+  ],
+  blocks: [
+    {pos:[0,0,1],state:0},
+    {pos:[1,0,1],state:1},
+    {pos:[2,0,1],state:2},
+    {pos:[3,0,1],state:3},
+    {pos:[0,1,0],state:4},
+    {pos:[1,1,0],state:5},
+    {pos:[2,1,0],state:6},
+    {pos:[3,1,0],state:7},
+    {pos:[4,1,0],state:8},
+    {pos:[0,0,0],state:9},
+    {pos:[1,0,0],state:9},
+    {pos:[2,0,0],state:9},
+    {pos:[3,0,0],state:9},
+    {pos:[4,0,0],state:9},
+    {pos:[4,0,1],state:10}
+  ],
+  entities: []
+}

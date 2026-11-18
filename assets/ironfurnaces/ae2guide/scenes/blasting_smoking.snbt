@@ -1,0 +1,13 @@
+{
+  DataVersion: 4325,
+  size: [2, 1, 1],
+  palette: [
+    {Name:"ironfurnaces:iron_furnace",Properties:{facing:"south",lit:"true",type:"2"}},
+    {Name:"ironfurnaces:iron_furnace",Properties:{facing:"south",lit:"true",type:"1"}}
+  ],
+  blocks: [
+    {pos:[0,0,0],state:0},
+    {pos:[1,0,0],state:1}
+  ],
+  entities: []
+}

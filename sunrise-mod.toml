@@ -1,6 +1,6 @@
 id = "ironfurnaces"
 name = "Iron Furnaces"
-version = "4.4.5"
+version = "4.4.6"
 description = "Furnaces of every metal, with augments, factories and generators. A port of Iron Furnaces (Qelifern, XenoMustache, Astryxion; Apache-2.0) to Sunrise's mod API."
 authors = ["Qelifern (pizzaatime)", "XenoMustache", "Astryxion", "Sunrise port: Joeypc6"]
 api = "0.2"

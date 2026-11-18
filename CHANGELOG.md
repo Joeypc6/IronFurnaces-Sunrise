@@ -1,5 +1,10 @@
 # Changelog
 
+## 4.4.6 (Sunrise)
+
+- The W guide rewritten: 41 short pages covering every furnace tier, upgrades, augments, factories, generators, wireless heat, automation, the config file, and the other mods (AE2, its crafting ETA, Machine Work, JEI). Every item opens its own page with W.
+- In English, Spanish and German, with 24 3D scenes and 58 recipe boxes.
+
 ## 4.4.5 (Sunrise)
 
 First release for Sunrise (Nightly 2026-11-17, `2d81263`, Minecraft 26.3), moved from the Horizon port.

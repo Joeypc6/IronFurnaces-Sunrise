@@ -1,0 +1,33 @@
+---
+navigation:
+  title: Tiers and speeds
+  parent: furnaces/index.md
+  position: 20
+  icon: gold_furnace
+---
+
+# Tiers and speeds
+
+Time for one item (a vanilla furnace: 10 s). Blasting and smoking recipes take half.
+
+| Furnace | Time | At once | Factory rows |
+|---|---|---|---|
+| <ItemLink id="copper_furnace" /> | 9 s | 1 | 2 |
+| <ItemLink id="iron_furnace" /> | 8 s | 1 | 2 |
+| <ItemLink id="silver_furnace" /> | 7 s | 1 | 4 |
+| <ItemLink id="gold_furnace" /> | 6 s | 1 | 4 |
+| <ItemLink id="diamond_furnace" /> | 4 s | 1 | 4 |
+| <ItemLink id="emerald_furnace" /> | 2 s | 1 | 4 |
+| <ItemLink id="crystal_furnace" /> | 2 s | 1 | 6 |
+| <ItemLink id="obsidian_furnace" /> | 1 s | 1 | 6 |
+| <ItemLink id="netherite_furnace" /> | 0.25 s | 1 | 6 |
+| <ItemLink id="allthemodium_furnace" /> | 0.25 s | 16 | 6 |
+| <ItemLink id="vibranium_furnace" /> | 0.15 s | 32 | 6 |
+| <ItemLink id="unobtainium_furnace" /> | 0.05 s | 64 | 6 |
+| <ItemLink id="million_furnace" /> | 1 s | 64 | 6 |
+
+The top tiers (Allthemodium and up) need the Allthemodium mod's metals.
+
+<GameScene zoom="4" interactive={true}>
+  <ImportStructure src="../scenes/tiers.snbt" />
+</GameScene>

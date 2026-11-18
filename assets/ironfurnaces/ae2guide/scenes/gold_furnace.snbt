@@ -1,0 +1,11 @@
+{
+  DataVersion: 4325,
+  size: [1, 1, 1],
+  palette: [
+    {Name:"ironfurnaces:gold_furnace",Properties:{facing:"south",lit:"true"}}
+  ],
+  blocks: [
+    {pos:[0,0,0],state:0}
+  ],
+  entities: []
+}

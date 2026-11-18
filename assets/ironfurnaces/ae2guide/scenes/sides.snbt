@@ -1,0 +1,18 @@
+{
+  DataVersion: 4325,
+  size: [2, 4, 1],
+  palette: [
+    {Name:"minecraft:hopper",Properties:{enabled:"true",facing:"down"}},
+    {Name:"ironfurnaces:iron_furnace",Properties:{facing:"south",lit:"true"}},
+    {Name:"minecraft:hopper",Properties:{enabled:"true",facing:"east"}},
+    {Name:"minecraft:chest",Properties:{facing:"south",type:"single",waterlogged:"false"}}
+  ],
+  blocks: [
+    {pos:[1,3,0],state:0},
+    {pos:[1,2,0],state:1},
+    {pos:[0,2,0],state:2},
+    {pos:[1,1,0],state:0},
+    {pos:[1,0,0],state:3}
+  ],
+  entities: []
+}

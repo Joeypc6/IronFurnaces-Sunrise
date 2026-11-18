@@ -1,0 +1,15 @@
+{
+  DataVersion: 4325,
+  size: [2, 2, 1],
+  palette: [
+    {Name:"ironfurnaces:diamond_furnace",Properties:{facing:"south",lit:"true"}},
+    {Name:"ae2:pattern_provider"},
+    {Name:"ae2:controller"}
+  ],
+  blocks: [
+    {pos:[1,0,0],state:0},
+    {pos:[1,1,0],state:1},
+    {pos:[0,1,0],state:2}
+  ],
+  entities: []
+}
