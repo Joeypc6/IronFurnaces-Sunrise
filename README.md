@@ -1,5 +1,7 @@
 # Iron Furnaces for Sunrise
 
+<p align="center"><img src="docs/images/ironfurnaces.png" alt="Iron Furnaces" width="128"></p>
+
 Iron Furnaces 4.4.2 (Qelifern, XenoMustache, Astryxion; Apache-2.0) as a native Sunrise mod: Hooks and Parts only, no
 mixins and no `[[inject]]`. It was first written for the arismoko/horizon fork and moved to Sunrise on 2026-11-17; the
 older Horizon mixin port is [IronFurnaces-Horizon](https://github.com/Joeypc6/IronFurnaces-Horizon).
@@ -10,6 +12,14 @@ Pinned to Sunrise Nightly 2026-11-17, commit `2d8126336e579777eabf9b2fd8b3d47623
 Optional dependencies: JEI (`^0.5`, the generator categories), GuideME (`^0.1`, the W guide), AE2 (`^15.4.13`,
 `ae2::api::register_machine` for its crafting ETA) and Machine Work (`^0.1`, the shared `machine_work::MACHINE_WORK`
 capability); the launcher turns on the Cargo feature named after each one when it is installed.
+
+
+## Screenshots
+
+| | |
+|---|---|
+| ![Every furnace tier smelting, with Jade's overlay](docs/images/1-furnaces.jpg) | ![A furnace's screen](docs/images/2-screen.jpg) |
+| ![The W guide, opened from any Iron Furnaces item](docs/images/3-guide.jpg) | ![The guide's furnace tiers page](docs/images/4-guide-tiers.jpg) |
 
 ## Layout
 
