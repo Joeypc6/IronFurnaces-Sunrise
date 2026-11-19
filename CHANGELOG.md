@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.4.7 (2026-11-19)
+
+- Pinned to the Sunrise Nightly of 2026-11-19 (`ed3ac19`): screen tooltips use the new rich-text lines, placement and
+  comparator output the new hook signatures.
+- The furnaces' loot tables are in 26.3's form, so their drop conditions and functions apply (the Nightly reads only
+  that form).
+
 ## 4.4.6 (Sunrise)
 
 - The W guide rewritten: 41 short pages covering every furnace tier, upgrades, augments, factories, generators, wireless heat, automation, the config file, and the other mods (AE2, its crafting ETA, Machine Work, JEI). Every item opens its own page with W.

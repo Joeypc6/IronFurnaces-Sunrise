@@ -8,7 +8,7 @@ older Horizon mixin port is [IronFurnaces-Horizon](https://github.com/Joeypc6/Ir
 Its logic was checked against the decompiled 4.4.2 jar. The textures, models,
 recipes and language files are the original mod's.
 
-Pinned to Sunrise Nightly 2026-11-17, commit `2d8126336e579777eabf9b2fd8b3d476236a04f2` (`sunrise-mod.toml`).
+Pinned to Sunrise Nightly 2026-11-19, commit `ed3ac19558d8dc1092c431312848cbb58fb01e41` (`sunrise-mod.toml`).
 Optional dependencies: JEI (`^0.5`, the generator categories), GuideME (`^0.1`, the W guide), AE2 (`^15.4.13`,
 `ae2::api::register_machine` for its crafting ETA) and Machine Work (`^0.1`, the shared `machine_work::MACHINE_WORK`
 capability); the launcher turns on the Cargo feature named after each one when it is installed.

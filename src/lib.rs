@@ -180,6 +180,7 @@ impl Hooks for Mod {
                     faces: std::array::from_fn(|_| all.clone()),
                     inputs: vec![0, 1, 6, 7, 8, 9, 10, 11, 12],
                     outputs: vec![1, 2, 6, 13, 14, 15, 16, 17, 18],
+                    insert_rules: Vec::new(),
                     menu: Some("ironfurnaces:furnace".to_owned()),
                 },
             );
@@ -192,6 +193,7 @@ impl Hooks for Mod {
                 faces: std::array::from_fn(|_| Vec::new()),
                 inputs: Vec::new(),
                 outputs: Vec::new(),
+                insert_rules: Vec::new(),
                 menu: Some("ironfurnaces:heater".to_owned()),
             },
         );
@@ -353,8 +355,9 @@ impl BlockPart for Furnace {
         interact::use_without_item(host, event.click)
     }
 
-    fn state_for_placement(&self, level: &dyn LevelHost, event: &mut StateForPlacementEvent<'_>) -> Option<Option<BlockState>> {
-        // getStateForPlacement: facing the player.
+    fn state_for_placement(&self, level: LevelSide, event: &mut StateForPlacementEvent<'_>) -> Option<Option<BlockState>> {
+        // getStateForPlacement: facing the player. Both sides answer it alike (a state change, no world read).
+        let (LevelSide::Server(level) | LevelSide::Client(level)) = level;
         let facing = interact::facing_for(event.context.yaw);
         level.state_with_property(event.state, "facing", facing).map(Some)
     }
@@ -363,7 +366,7 @@ impl BlockPart for Furnace {
         event.output = true;
     }
 
-    fn analog_output(&self, _level: &dyn LevelHost, event: &mut AnalogOutputEvent) {
+    fn analog_output(&self, _level: &mut dyn LevelRandomHost, event: &mut AnalogOutputEvent) {
         let key = (event.dimension.key().id().to_owned(), [event.pos.x, event.pos.y, event.pos.z]);
         event.output = with_state(|s| s.comparator.get(&key).copied()).unwrap_or(0);
     }
@@ -424,7 +427,9 @@ impl BlockEntityPart for Furnace {
     }
 
     fn screen_tooltip(&self, host: &dyn ClientHost, event: &mut ScreenTooltipEvent<'_>) {
-        screen::tooltip(host, event.block, event.data, event.at, event.lines);
+        let mut lines = Vec::new();
+        screen::tooltip(host, event.block, event.data, event.at, &mut lines);
+        event.lines.extend(lines.into_iter().map(|l| (Text::literal(l), u32::MAX)));
     }
 
     fn menu_button(&self, host: &mut dyn ServerHost, event: &mut MenuButtonEvent<'_>) {
@@ -491,7 +496,9 @@ impl BlockEntityPart for Heater {
     }
 
     fn screen_tooltip(&self, host: &dyn ClientHost, event: &mut ScreenTooltipEvent<'_>) {
-        screen::tooltip(host, event.block, event.data, event.at, event.lines);
+        let mut lines = Vec::new();
+        screen::tooltip(host, event.block, event.data, event.at, &mut lines);
+        event.lines.extend(lines.into_iter().map(|l| (Text::literal(l), u32::MAX)));
     }
 
     fn pre_remove_side_effects(&self, _level: &mut dyn LevelRandomHost, event: &mut PreRemoveSideEffectsEvent<'_>) {
