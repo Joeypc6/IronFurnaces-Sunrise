@@ -414,24 +414,6 @@ impl BlockEntityPart for Furnace {
         Some(tag)
     }
 
-    fn screen(&self, host: &dyn Host, event: &mut ScreenEvent<'_>) -> Option<Screen> {
-        screen::layout(host, event.block)
-    }
-
-    fn screen_draw(&self, host: &dyn ClientHost, event: &mut ScreenDrawEvent<'_>) {
-        screen::draw(host, event.block, event.data, event.draw, event.origin);
-    }
-
-    fn screen_click(&self, host: &dyn ClientHost, event: &mut ScreenClickEvent<'_>) -> Option<i32> {
-        screen::click(host, event.block, event.data, event.at, event.right)
-    }
-
-    fn screen_tooltip(&self, host: &dyn ClientHost, event: &mut ScreenTooltipEvent<'_>) {
-        let mut lines = Vec::new();
-        screen::tooltip(host, event.block, event.data, event.at, &mut lines);
-        event.lines.extend(lines.into_iter().map(|l| (Text::literal(l), u32::MAX)));
-    }
-
     fn menu_button(&self, host: &mut dyn ServerHost, event: &mut MenuButtonEvent<'_>) {
         screen::menu_button(host, event.context.player, event.context.pos, event.context.id, &mut event.entity.nbt);
     }
@@ -485,20 +467,6 @@ impl BlockEntityPart for Heater {
 
     fn block_entity_tick(&self, _host: &mut dyn ServerHost, event: &mut BlockEntityTickEvent<'_>) {
         furnace::heater_tick(event.pos, &mut event.entity);
-    }
-
-    fn screen(&self, host: &dyn Host, event: &mut ScreenEvent<'_>) -> Option<Screen> {
-        screen::layout(host, event.block)
-    }
-
-    fn screen_draw(&self, host: &dyn ClientHost, event: &mut ScreenDrawEvent<'_>) {
-        screen::draw(host, event.block, event.data, event.draw, event.origin);
-    }
-
-    fn screen_tooltip(&self, host: &dyn ClientHost, event: &mut ScreenTooltipEvent<'_>) {
-        let mut lines = Vec::new();
-        screen::tooltip(host, event.block, event.data, event.at, &mut lines);
-        event.lines.extend(lines.into_iter().map(|l| (Text::literal(l), u32::MAX)));
     }
 
     fn pre_remove_side_effects(&self, _level: &mut dyn LevelRandomHost, event: &mut PreRemoveSideEffectsEvent<'_>) {
@@ -558,6 +526,27 @@ impl ItemPart for StandIn {
 
 #[mod_api::sunrise_part]
 impl MenuPart for Menus {
+    fn screen(&self, host: &dyn Host, event: &mut ScreenEvent<'_>) -> Option<Screen> {
+        screen::layout(host, event.block?)
+    }
+
+    fn screen_draw(&self, host: &dyn ClientHost, event: &mut ScreenDrawEvent<'_>) {
+        if let Some(block) = event.block {
+            screen::draw(host, block, event.data, event.draw, event.origin);
+        }
+    }
+
+    fn screen_click(&self, host: &dyn ClientHost, event: &mut ScreenClickEvent<'_>) -> Option<i32> {
+        screen::click(host, event.block?, event.data, event.at, event.right)
+    }
+
+    fn screen_tooltip(&self, host: &dyn ClientHost, event: &mut ScreenTooltipEvent<'_>) {
+        let Some(block) = event.block else { return };
+        let mut lines = Vec::new();
+        screen::tooltip(host, block, event.data, event.at, &mut lines);
+        event.lines.extend(lines.into_iter().map(|l| (Text::literal(l), u32::MAX)));
+    }
+
     fn menu_slot_rules(&self, _host: &dyn Host, event: &mut MenuSlotRulesEvent<'_>) {
         let Some(keys) = KEYS.get() else { return };
         if event.container != MenuContainer::Main {
