@@ -42,10 +42,16 @@ pub(crate) fn facing_for(yaw: f32) -> &'static str {
 /// Opens the furnace's screen for `player`: the page shown is the furnace's own (AugmentGUI off, as interactWith).
 pub(crate) fn open(host: &mut dyn ServerHost, player: PlayerRef, uuid: u128, level: LevelRef, pos: Pos) -> bool {
     let Some(entity) = host.block_entity(level, pos) else { return false };
-    let mut c = Compound::new();
-    set_i(&mut c, "AugmentGUI", 0);
-    let _ = entity.merge_data(host, c);
-    host.block_entity_sync(pos);
+    // Only when the augment page is showing: a write just before the menu opens leaves the client's screen cut off
+    // from it (a new furnace has no AugmentGUI yet, so its first screen showed nothing that moved).
+    if entity.data(host).is_some_and(|d| get_i(&d, "AugmentGUI", 0) != 0) {
+        let mut c = Compound::new();
+        set_i(&mut c, "AugmentGUI", 0);
+        let _ = entity.merge_data(host, c);
+        host.block_entity_sync(pos);
+        reopen_later(uuid, pos);
+        return true;
+    }
     with_state(|s| s.layout_pos = Some(pos));
     let opened = matches!(player.open_menu(host, entity), Ok(true));
     // (After: opening closes the menu that was open, which forgets it.)

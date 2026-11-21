@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.4.9 (2026-11-21)
+
+- A newly placed furnace's first screen now shows its slots: items put in or taken out showed only after reopening it.
+
 ## 4.4.8 (2026-11-20)
 
 - Updated for Sunrise Nightly 2026-11-20 (`9425651`): furnace and heater screens now attach to their menu types.
