@@ -1,5 +1,10 @@
 # Changelog
 
+## 4.4.8 (2026-11-20)
+
+- Updated for Sunrise Nightly 2026-11-20 (`9425651`): furnace and heater screens now attach to their menu types.
+- The SDK-built package includes the Apache-2.0 `LICENSE` and `NOTICE`.
+
 ## 4.4.7 (2026-11-19)
 
 - Pinned to the Sunrise Nightly of 2026-11-19 (`ed3ac19`): screen tooltips use the new rich-text lines, placement and

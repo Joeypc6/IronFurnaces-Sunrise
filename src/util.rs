@@ -4,15 +4,6 @@ use mod_api::*;
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
-pub(crate) trait KeyOf {
-    type Key;
-}
-impl<K, V> KeyOf for std::collections::BTreeMap<K, V> {
-    type Key = K;
-}
-/// The compound's key type (the API doesn't export it by name).
-pub(crate) type JavaString = <Compound as KeyOf>::Key;
-
 pub(crate) type Pos = [i32; 3];
 
 pub(crate) fn java(s: &str) -> JavaString {

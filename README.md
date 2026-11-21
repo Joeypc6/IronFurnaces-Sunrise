@@ -8,7 +8,7 @@ older Horizon mixin port is [IronFurnaces-Horizon](https://github.com/Joeypc6/Ir
 Its logic was checked against the decompiled 4.4.2 jar. The textures, models,
 recipes and language files are the original mod's.
 
-Pinned to Sunrise Nightly 2026-11-19, commit `ed3ac19558d8dc1092c431312848cbb58fb01e41` (`sunrise-mod.toml`).
+Pinned to Sunrise Nightly 2026-11-20, commit `94256510f74e6843754e0a93fd9e4da7e45b1056` (`sunrise-mod.toml`).
 Optional dependencies: JEI (`^0.5`, the generator categories), GuideME (`^0.1`, the W guide), AE2 (`^15.4.13`,
 `ae2::api::register_machine` for its crafting ETA) and Machine Work (`^0.1`, the shared `machine_work::MACHINE_WORK`
 capability); the launcher turns on the Cargo feature named after each one when it is installed.
@@ -45,10 +45,11 @@ capability); the launcher turns on the Cargo feature named after each one when i
 
 ## Build and run
 
-Copy the mod into the launcher's project folder and build it with the other ports:
-`sunrise-launcher native-build --instance development --version nightly-2026-11-17-2d81263 --trust-native-code`,
-then play the instance. `cargo test` runs the unit tests against the pinned SDK (`.sunrise/sdk`, fetched by
-`cargo sunrise-mod`).
+Run `cargo sunrise-mod build` from the project root. It fetches the pinned SDK into `.sunrise/sdk`, builds the mod,
+and packs `target/sunrise-mod/ironfurnaces.smod` with the root `LICENSE` and `NOTICE`. Use that package for releases
+so the Apache-2.0 notices ship with the assets. `cargo test` runs the unit tests against the fetched SDK.
+
+To play with optional integrations, build the mod with the other ports in a development instance on the same Nightly.
 
 ## On the Sunrise APIs
 
@@ -58,7 +59,7 @@ then play the instance. `cargo test` runs the unit tests against the pinned SDK 
 - Items are Sunrise's `ITEMS` capability (WorldlyContainer rules: the slots each side's setting reaches, what fits
   there, what may come out); auto input and output move through the neighbours' `ITEMS` handlers in transactions.
 - The player's furnace list is an attachment saved with the player; the menus are content menu types with a
-  `MenuPart`'s slot rules; the screen is the block entity Part's screen hooks.
+  `MenuPart`'s slot rules and screen hooks.
 - The light: the blocks declare `dynamic_light`, and `light_emission` gives 0 while `misc.lightupdates` is on, as the
   Java mod; otherwise a lit furnace gives the data's `state_light` (14).
 - Flames, smoke and their sounds come from the client block entity tick (`block_entity_client_tick`), at vanilla's

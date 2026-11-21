@@ -5,8 +5,6 @@
 use crate::config::{self, cfg};
 use crate::recipes::{self, Cooked, Kind};
 use crate::util::*;
-// Sunrise now exports its own `JavaString` (the same type): the port's alias, named so the two globs don't clash.
-use crate::util::JavaString;
 use crate::{owners, with_state};
 use mod_api::*;
 
@@ -251,11 +249,13 @@ fn add_recipe_used(nbt: &mut Compound, id: &str, experience: f32, times: u32) {
 
 /// The recipes kept for experience, and the experience: splitAndSpawnExperience's amount over them. Clears them.
 pub(crate) fn take_experience(nbt: &mut Compound) -> (Vec<String>, u32) {
-    let keys: Vec<JavaString> = nbt
-        .iter()
-        .filter(|(k, _)| k.to_string_lossy().starts_with("RecipesUsed."))
-        .map(|(k, _)| k.clone())
+    let mut keys: Vec<JavaString> = nbt
+        .keys()
+        .filter(|k| k.to_string_lossy().starts_with("RecipesUsed."))
+        .cloned()
         .collect();
+    // Keep the recipe award order when Compound traversal is not sorted.
+    keys.sort_unstable();
     let mut total = 0u32;
     let mut ids = Vec::new();
     for key in keys {

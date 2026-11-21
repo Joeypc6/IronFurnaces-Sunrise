@@ -4,8 +4,6 @@
 
 use crate::furnace::{self, SLOTS};
 use crate::util::*;
-// Sunrise now exports its own `JavaString` (the same type): the port's alias, named so the two globs don't clash.
-use crate::util::JavaString;
 use crate::with_state;
 use mod_api::*;
 
