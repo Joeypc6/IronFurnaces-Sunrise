@@ -250,7 +250,7 @@ pub(crate) fn run(host: &mut dyn ServerHost, player: u128, level: LevelRef, bloc
     }
     let mut slots: Vec<Option<ItemStack>> = e.items[..SLOTS].to_vec();
     for i in INV..END {
-        slots.push(if i == index { Some(stack.clone()) } else { ItemPlace::PlayerSlot { player, slot: player_slot(i) }.stack(host) });
+        slots.push(if i == index { Some(stack.clone()) } else { ItemPlace::PlayerSlot { player, slot: player_slot(i) }.with_stack(host, |s| s.project()).flatten() });
     }
     let original = slots.clone();
     let fields = Fields { nbt: e.nbt.clone(), items: Vec::new(), data: Vec::new() };
@@ -281,7 +281,8 @@ pub(crate) fn run(host: &mut dyn ServerHost, player: u128, level: LevelRef, bloc
                 let place = ItemPlace::PlayerSlot { player, slot: player_slot(i) };
                 let (side, out) = if pass == 0 { (&original[i], true) } else { (&after[i], false) };
                 if let Some(s) = side {
-                    let n = if out { place.extract(host, tx, &ItemResource::of(s), s.count()) } else { place.insert(host, tx, &ItemResource::of(s), s.count()) };
+                    let n = if out { place.extract(host, tx, &ItemResource::of(s), s.count()) } else { place.insert(host, tx, &ItemResource::of(s), s.count()) }
+                        .unwrap_or(0);
                     if n != s.count() {
                         return Err(());
                     }
@@ -326,7 +327,7 @@ pub(crate) fn sweep(host: &mut dyn ServerHost, player: u128, stacks: &[Option<It
     for (slot, s) in marked {
         let place = ItemPlace::PlayerSlot { player, slot };
         let _ = host.transaction(|host, tx| match place.extract(host, tx, &ItemResource::of(&s), s.count()) {
-            n if n == s.count() => Ok(()),
+            Ok(n) if n == s.count() => Ok(()),
             _ => Err(()),
         });
     }

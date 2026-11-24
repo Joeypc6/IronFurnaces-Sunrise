@@ -28,9 +28,20 @@ fn take_one(host: &mut dyn ServerHost, player: u128, hand: Hand, stack: &ItemSta
     let place = hand_slot(&*host, player, hand);
     let resource = ItemResource::of(stack);
     let _ = host.transaction(|host, tx| match place.extract(host, tx, &resource, 1) {
-        1 => Ok(()),
+        Ok(1) => Ok(()),
         _ => Err(()),
     });
+}
+
+/// The facing a block placed along `direction` by a non-player (DirectionalPlaceContext) gets: the opposite of its
+/// horizontal direction, which is the direction itself, or north when it is vertical.
+pub(crate) fn facing_for_direction(direction: Direction) -> &'static str {
+    match direction {
+        Direction::South => "north",
+        Direction::West => "east",
+        Direction::East => "west",
+        Direction::North | Direction::Up | Direction::Down => "south",
+    }
 }
 
 /// The facing a block placed by a player looking `yaw` gets: their horizontal direction's opposite.
@@ -53,6 +64,7 @@ pub(crate) fn open(host: &mut dyn ServerHost, player: PlayerRef, uuid: u128, lev
         return true;
     }
     with_state(|s| s.layout_pos = Some(pos));
+    pad_slots(host, entity, SLOTS);
     let opened = matches!(player.open_menu(host, entity), Ok(true));
     // (After: opening closes the menu that was open, which forgets it.)
     if opened {
@@ -113,7 +125,7 @@ pub(crate) fn use_without_item(host: &mut dyn ServerHost, click: &BlockClick<'_>
     let pos = click.pos;
     if sneaking(host, player) {
         // A sneaking click with an item is the item's (an upgrade's, the linker's useOn), not the block's.
-        let held = click.stack.cloned().or_else(|| ItemPlace::PlayerHand { player: click.player, hand: click.hand }.stack(host));
+        let held = click.stack.cloned().or_else(|| ItemPlace::PlayerHand { player: click.player, hand: click.hand }.with_stack(host, |s| s.project()).flatten());
         if held.is_some() {
             return None;
         }
@@ -153,8 +165,8 @@ fn copy_settings(host: &mut dyn ServerHost, player: PlayerRef, click: &BlockClic
     let place = hand_slot(&*host, click.player, click.hand);
     let resource = ItemResource::of(&written);
     let _ = host.transaction(|host, tx| match place.exchange(host, tx, &resource, stack.count()) {
-        0 => Err(()),
-        _ => Ok(()),
+        Ok(0) | Err(_) => Err(()),
+        Ok(_) => Ok(()),
     });
     let _ = player.tell(host, Text::literal("Settings copied"));
 }
@@ -169,7 +181,7 @@ pub(crate) fn linker_settings(stack: &ItemStack) -> Option<Compound> {
 
 /// ItemFurnaceCopy.useOn, sneaking: the held settings onto the furnace, and its facing.
 fn apply_settings(host: &mut dyn ServerHost, player: PlayerRef, stack: &ItemStack, level: LevelRef, pos: Pos) -> bool {
-    let block = level.block(host, pos).map(|b| b.id(host)).unwrap_or_default();
+    let block = level.block(host, pos).and_then(|b| b.id(host).map(str::to_owned)).unwrap_or_default();
     if !furnace::is_furnace(&block) {
         return false;
     }
@@ -224,7 +236,7 @@ pub(crate) fn upgrade_of(item: &str) -> Option<(&'static str, &'static str)> {
 fn upgrade(host: &mut dyn ServerHost, player: PlayerRef, uuid: u128, hand: Hand, stack: &ItemStack, level: LevelRef, pos: Pos) -> bool {
     let item = id_of(host, stack);
     let Some((from, to)) = upgrade_of(&item) else { return false };
-    let Some(block) = level.block(host, pos).map(|b| b.id(host)) else { return false };
+    let Some(block) = level.block(host, pos).and_then(|b| b.id(host).map(str::to_owned)) else { return false };
     if block != from {
         return false;
     }
@@ -313,6 +325,7 @@ pub(crate) fn heater_use(host: &mut dyn ServerHost, click: &BlockClick<'_>) -> O
     }
     let entity = host.block_entity(level, click.pos)?;
     with_state(|s| s.layout_pos = Some(click.pos));
+    pad_slots(host, entity, 1);
     matches!(player.open_menu(host, entity), Ok(true)).then_some(InteractionResult::SuccessServer)
 }
 
@@ -337,8 +350,27 @@ pub(crate) fn reopen_pending(host: &mut dyn ServerHost) {
         let Some(entity) = host.block_entity(level, pos) else { continue };
         host.block_entity_sync(pos);
         with_state(|s| s.layout_pos = Some(pos));
+        let slots = if host.level(host.dimension()).and_then(|l| l.block(&*host, pos)).and_then(|b| b.id(&*host)).is_some_and(furnace::is_heater) { 1 } else { SLOTS };
+        pad_slots(host, entity, slots);
         if matches!(player.open_menu(host, entity), Ok(true)) {
             with_state(|s| s.open.insert(uuid, pos));
         }
     }
+}
+
+/// Workaround for sunrise-org/sunrise#4463 (Sunrise main): a new block entity holds no item slots until one is
+/// written, and a menu opened on it is sized by the slots it holds, not by its container's `slots`. A shift-click
+/// there is mapped to the wrong inventory slot and the clicked stack stays as it moves (a duplicate). Writing the last
+/// of the `slots` once, and clearing it, makes the entity hold all of them and leaves its contents as they were.
+fn pad_slots(host: &mut dyn ServerHost, entity: BlockEntityRef, slots: usize) {
+    let Some(last) = slots.checked_sub(1) else { return };
+    if !matches!(entity.item_slot(&*host, last as u32), Ok(None)) {
+        return;
+    }
+    let Some(filler) = stack_of(&*host, "minecraft:stone", 1) else { return };
+    let _ = host.transaction(|host, tx| {
+        entity.set_item_slot(host, tx, last as u32, Some(filler)).map_err(|_| ())?;
+        entity.set_item_slot(host, tx, last as u32, None).map_err(|_| ())?;
+        Ok::<(), ()>(())
+    });
 }

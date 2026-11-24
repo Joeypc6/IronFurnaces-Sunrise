@@ -1,25 +1,15 @@
 # Iron Furnaces for Sunrise
 
-<p align="center"><img src="docs/images/ironfurnaces.png" alt="Iron Furnaces" width="128"></p>
-
-Iron Furnaces 4.4.2 (Qelifern, XenoMustache, Astryxion; Apache-2.0) as a native Sunrise mod: Hooks and Parts only, no
+Iron Furnaces 4.4.2 (Qelifern, XenoMustache, Astryxion; GPL-3.0) as a native Sunrise mod: Hooks and Parts only, no
 mixins and no `[[inject]]`. It was first written for the arismoko/horizon fork and moved to Sunrise on 2026-11-17; the
-older Horizon mixin port is [IronFurnaces-Horizon](https://github.com/Joeypc6/IronFurnaces-Horizon).
-Its logic was checked against the decompiled 4.4.2 jar. The textures, models,
+older Horizon mixin port is kept outside the workspace (`Z:\AE2Converter-build\ref\horizon-ports\ironfurnaces-horizon`).
+Its logic was checked against the decompiled jar (`Z:\AE2Converter-build\ref\decomp\if`). The textures, models,
 recipes and language files are the original mod's.
 
-Pinned to Sunrise Nightly 2026-11-20, commit `94256510f74e6843754e0a93fd9e4da7e45b1056` (`sunrise-mod.toml`).
+Pinned to Sunrise Nightly 2026-11-17, commit `2d8126336e579777eabf9b2fd8b3d476236a04f2` (`sunrise-mod.toml`).
 Optional dependencies: JEI (`^0.5`, the generator categories), GuideME (`^0.1`, the W guide), AE2 (`^15.4.13`,
 `ae2::api::register_machine` for its crafting ETA) and Machine Work (`^0.1`, the shared `machine_work::MACHINE_WORK`
 capability); the launcher turns on the Cargo feature named after each one when it is installed.
-
-
-## Screenshots
-
-| | |
-|---|---|
-| ![Every furnace tier smelting, with Jade's overlay](docs/images/1-furnaces.jpg) | ![A furnace's screen](docs/images/2-screen.jpg) |
-| ![The W guide, opened from any Iron Furnaces item](docs/images/3-guide.jpg) | ![The guide's furnace tiers page](docs/images/4-guide-tiers.jpg) |
 
 ## Layout
 
@@ -41,15 +31,14 @@ capability); the launcher turns on the Cargo feature named after each one when i
   - `ae2_eta.rs`: the same times through `ae2::api::register_machine`, for an AE2 without the library (kept for now).
 - `assets/`, `data/` (content under `data/ironfurnaces/sunrise/`): generated from the jar by
   `tools/make_fork_content.py`. Run it after changing it.
-- The in-game test scripts drive a local test rig and aren't published; what they check is listed below.
+- `tests/*.sh`: the in-game tests from the fork (they still drive `horizon-ctl`; to be moved to `sunrise-ctl`).
 
 ## Build and run
 
-Run `cargo sunrise-mod build` from the project root. It fetches the pinned SDK into `.sunrise/sdk`, builds the mod,
-and packs `target/sunrise-mod/ironfurnaces.smod` with the root `LICENSE` and `NOTICE`. Use that package for releases
-so the Apache-2.0 notices ship with the assets. `cargo test` runs the unit tests against the fetched SDK.
-
-To play with optional integrations, build the mod with the other ports in a development instance on the same Nightly.
+Copy the mod into the launcher's project folder and build it with the other ports:
+`sunrise-launcher native-build --instance development --version nightly-2026-11-17-2d81263 --trust-native-code`,
+then play the instance. `cargo test` runs the unit tests against the pinned SDK (`.sunrise/sdk`, fetched by
+`cargo sunrise-mod`).
 
 ## On the Sunrise APIs
 
@@ -59,14 +48,14 @@ To play with optional integrations, build the mod with the other ports in a deve
 - Items are Sunrise's `ITEMS` capability (WorldlyContainer rules: the slots each side's setting reaches, what fits
   there, what may come out); auto input and output move through the neighbours' `ITEMS` handlers in transactions.
 - The player's furnace list is an attachment saved with the player; the menus are content menu types with a
-  `MenuPart`'s slot rules and screen hooks.
+  `MenuPart`'s slot rules; the screen is the block entity Part's screen hooks.
 - The light: the blocks declare `dynamic_light`, and `light_emission` gives 0 while `misc.lightupdates` is on, as the
   Java mod; otherwise a lit furnace gives the data's `state_light` (14).
 - Flames, smoke and their sounds come from the client block entity tick (`block_entity_client_tick`), at vanilla's
   random display tick rate: the chance a block within 16 and 32 blocks of the player is picked, as `animateTick`.
 
-- The W guide is GuideME's (GuideME): the pages are in `assets/ironfurnaces/ae2guide` with their 3D scenes.
-- The recipe viewer is JEI's ([JEI for Sunrise](https://github.com/Joeypc6/JEI-Sunrise), `jei::api`, `src/jei.rs`): the three generator categories (fuels, foods,
+- The W guide is GuideME's (`../guide-fork`): the pages are in `assets/ironfurnaces/ae2guide` with their 3D scenes.
+- The recipe viewer is JEI's (`../jei-fork`, `jei::api`, `src/jei.rs`): the three generator categories (fuels, foods,
   `generator_blasting` recipes, each with its energy) and the catalysts (the furnaces and the factory augment for
   smelting, the blasting and smoking augments, the generator augment), as IronFurnacesJEIPlugin registers them.
 
@@ -81,7 +70,7 @@ Workarounds kept:
   also runs at a player's first check after joining). It can't reach the world or a container either: the first
   tick it spends in an inventory removes it (`inventory_tick`), a dropped one never joins the level
   (`entity_join_level`), it can't be tossed (`item_toss`) or picked up by a hopper (`hopper_pickup_item`), and no
-  container menu is open at the same time as the furnace's (an in-game test checks quitting right after a whole-stack
+  container menu is open at the same time as the furnace's (`tests/standin.sh` checks quitting right after a whole-stack
   shift-click, a given, tossed and dropper-fired stand-in over a hopper and chest, and a LAN guest's shift-clicks and
   disconnect).
   Moves from the furnace's own slots are the game's routing (into the inventory, results from its end), as Java's.
@@ -104,7 +93,8 @@ Workarounds kept:
 
 On Sunrise (2026-11-17, Nightly 2d81263): all 13 furnaces register and place; a Diamond Furnace smelts raw iron with
 coal (7 ingots after a few seconds), shows flames and smoke at its front, plays the crackle sound and lights its
-surroundings (13 next to it); the screens open. Tested on the fork before the move (in-game test scripts):
+surroundings (13 next to it); the screens open. Tested on the fork before the move (`tests/ingame.sh`,
+`tests/ingame2.sh`):
 
 `ingame.sh`: all 13 furnaces and the transmitter place with their states; an Iron Furnace smelts raw iron with coal at
 its tier's 160 ticks (lit while burning); the furnace screen's slots sit at the Java container's positions (56,17 /

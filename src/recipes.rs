@@ -123,7 +123,7 @@ pub(crate) fn ensure_sets(host: &dyn Host) {
     }
     for item in host.item_keys() {
         let id = item.id(host);
-        if id == "ironfurnaces:rainbow_coal" || host.item_burn_time(item).unwrap_or(0) > 0 {
+        if id == Some("ironfurnaces:rainbow_coal") || host.item_burn_time(item).unwrap_or(0) > 0 {
             out.fuel.insert(item);
         }
         if let Some(Tag::Compound(food)) = host.item_default_component(item, "minecraft:food")

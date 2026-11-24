@@ -63,7 +63,7 @@ pub(crate) fn furnace_pace(cook: i32, parallel: u32) -> Option<(u32, u32)> {
 /// The furnace at `at`, as `working_furnace` reads it, with its block.
 #[cfg_attr(not(feature = "machine_work"), allow(dead_code))]
 fn read(host: &dyn Host, at: BlockSide) -> Option<(String, Fields, i32)> {
-    let block = at.level.block(host, at.pos)?.id(host);
+    let block = at.level.block(host, at.pos)?.id(host)?.to_owned();
     let (e, mode) = working_furnace(host, at.level, at.pos, &block)?;
     Some((block, e, mode))
 }

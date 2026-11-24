@@ -1,5 +1,6 @@
 //! Small helpers: the saved compound's typed reads and writes, items by name, block positions.
 
+use mod_api::item::containers::ModBlockEntityFields;
 use mod_api::*;
 use std::collections::HashMap;
 use std::sync::OnceLock;
@@ -54,7 +55,7 @@ pub(crate) fn set_int_array(nbt: &mut Compound, key: &str, values: Vec<i32>) {
 /// Item keys by id, looked up once (keys stay for the process).
 fn item_ids(host: &dyn Host) -> &'static HashMap<String, ItemKey> {
     static IDS: OnceLock<HashMap<String, ItemKey>> = OnceLock::new();
-    IDS.get_or_init(|| host.item_keys().into_iter().map(|k| (k.id(host), k)).collect())
+    IDS.get_or_init(|| host.item_keys().into_iter().filter_map(|k| Some((k.id(host)?.to_owned(), k))).collect())
 }
 
 pub(crate) fn item_key(host: &dyn Host, id: &str) -> Option<ItemKey> {
@@ -67,7 +68,7 @@ pub(crate) fn stack_of(host: &dyn Host, id: &str, count: u32) -> Option<ItemStac
 }
 
 pub(crate) fn id_of(host: &dyn Host, stack: &ItemStack) -> String {
-    stack.item().id(host)
+    stack.item().id(host).unwrap_or_default().to_owned()
 }
 
 pub(crate) fn is(host: &dyn Host, stack: &Option<ItemStack>, id: &str) -> bool {
@@ -143,4 +144,66 @@ pub(crate) fn sneaking(host: &dyn Host, player: PlayerRef) -> bool {
 /// take `ScreenSlot`s since 2d81263.
 pub(crate) fn slot_at(position: [f32; 2]) -> ScreenSlot {
     ScreenSlot { position, no_item_icon: None }
+}
+
+/// A block entity tick on an owned copy of its fields: the saved compound, the item slots and the menu data, as the
+/// tick hook handed them before it lent the resident entity in place. `tick` runs with the host and the copy; what
+/// it changed is written back to the entity and the chunk is marked to save (`setChanged`). A block entity gone
+/// between the two loans keeps nothing.
+pub(crate) fn tick_on_fields(
+    subject: &mut BlockEntityScope<'_>,
+    tick: impl FnOnce(&mut dyn ServerHost, Pos, &mut ModBlockEntityFields),
+) {
+    let Some((handle, pos, before)) = subject.with_view(|view| (view.handle(), view.position(), fields_of(&view))) else {
+        return;
+    };
+    let mut after = before.clone();
+    tick(subject.host(), pos, &mut after);
+    if after == before {
+        return;
+    }
+    if subject.with_view(|mut view| write_fields(&mut view, &before, &after)) == Some(true) {
+        let _ = handle.set_changed(subject.host());
+    }
+}
+
+/// The entity's fields, copied out of the view.
+pub(crate) fn fields_of(view: &BlockEntityView<'_>) -> ModBlockEntityFields {
+    ModBlockEntityFields {
+        nbt: view.nbt().clone(),
+        items: (0..view.item_slots() as u32).map(|i| view.item_slot(i).and_then(|s| s.to_owned())).collect(),
+        data: view.data_slots().to_vec(),
+    }
+}
+
+/// Writes what changed from `before` to `after` into the view: true when anything was written.
+pub(crate) fn write_fields(view: &mut BlockEntityView<'_>, before: &ModBlockEntityFields, after: &ModBlockEntityFields) -> bool {
+    let mut wrote = false;
+    for (key, value) in &after.nbt {
+        if before.nbt.get(key) != Some(value) {
+            wrote |= view.set_nbt(key.clone(), Some(value.clone()));
+        }
+    }
+    for key in before.nbt.keys() {
+        if !after.nbt.contains_key(key) {
+            wrote |= view.set_nbt(key.clone(), None);
+        }
+    }
+    for (slot, stack) in after.items.iter().enumerate().take(view.item_slots()) {
+        if before.items.get(slot) != Some(stack) {
+            wrote |= view.set_item_slot(slot as u32, stack.clone()).unwrap_or(false);
+        }
+    }
+    if after.data != before.data {
+        if after.data.len() == before.data.len() {
+            for (slot, value) in after.data.iter().enumerate() {
+                if before.data[slot] != *value {
+                    wrote |= view.set_data_slot(slot as u32, *value);
+                }
+            }
+        } else {
+            wrote |= view.set_data_slots(&after.data);
+        }
+    }
+    wrote
 }

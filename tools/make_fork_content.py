@@ -122,5 +122,16 @@ def main(jar):
     print(len(files), "files written under", ROOT)
 
 
+def commands_menu():
+    """The `/ironfurnaces` commands menu's pages (`../../tools/commands-menu/ironfurnaces.json`), written into assets/ after the wipe."""
+    import importlib.util
+    path = os.path.join(ROOT, "..", "tools", "commands-menu", "pages.py")
+    spec = importlib.util.spec_from_file_location("commands_menu_pages", path)
+    pages = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(pages)
+    pages.install(ROOT, "ironfurnaces")
+
+
 if __name__ == "__main__":
     main(sys.argv[1] if len(sys.argv) > 1 else JAR)
+    commands_menu()

@@ -1,0 +1,38 @@
+summary = "Faster furnaces in every metal, with augments that turn them into factories or generators."
+description = """
+Faster furnaces in every metal, with augments that turn them into factories or generators.
+
+A port of [Iron Furnaces](https://github.com/Qelifern/IronFurnaces) by Qelifern (pizzaatime), XenoMustache and Astryxion to [Sunrise](https://playsunrise.net) (Minecraft Java 26.3). One native mod on Sunrise's mod API: the code is a rewrite, checked against the original 4.4.2 release; the textures, models, recipes and language files are the original mod's. See `LICENSE` and `NOTICE`.
+
+What it does:
+
+- Thirteen furnaces, from Copper and Iron through Diamond, Obsidian and Netherite to Allthemodium, Vibranium, Unobtainium and the Rainbow Furnace, faster at each tier.
+- Upgrade items turn a placed furnace, a vanilla one included, into a better one.
+- Augments: speed and fuel, blasting and smoking, a factory mode that smelts in several rows at once, and a generator mode that burns fuel into energy.
+- A config tab for each side's input and output, automatic input and output, and redstone control; hoppers and pipes follow the sides.
+- The Settings Linker copies one furnace's settings onto another, and the Wireless Heat Transmitter binds and powers furnaces as in the original.
+- The Rainbow Furnace makes energy when its owner has a generator of every tier.
+- Experience from smelting, comparator output, flames, smoke and sounds as in the original.
+- Optional: JEI shows the generator recipes, and with the `guideme` library W over any Iron Furnaces item opens its guide.
+
+Differences from the original:
+
+- In JEI, a generator card shows its energy as text under the card, and its flame and energy bar are not animated.
+- The Settings Linker's settings and the transmitter's energy are kept in the item's custom data instead of the original's own item components.
+"""
+authors = ["Sunrise port: Joeypc6", "Qelifern (pizzaatime)", "XenoMustache", "Astryxion"]
+homepage = "https://github.com/Joeypc6/IronFurnaces-Sunrise"
+issues = "https://github.com/Joeypc6/IronFurnaces-Sunrise/issues"
+categories = ["technology"]
+
+[[screenshots]]
+path = "page/1-furnaces.jpg"
+caption = "Every furnace tier smelting, with Jade's overlay."
+
+[[screenshots]]
+path = "page/2-screen.jpg"
+caption = "A furnace's screen."
+
+[[screenshots]]
+path = "page/3-guide.jpg"
+caption = "The W guide, opened from any Iron Furnaces item."

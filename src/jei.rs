@@ -56,9 +56,9 @@ fn card(category: &str, key: &str, items: &[(&str, u32)], energy: i64) -> (Strin
 fn recipes(host: &dyn Host) -> Vec<(String, jei::api::RecipeDef)> {
     let mut out = Vec::new();
     let mut keys = host.item_keys();
-    keys.sort_by_key(|k| k.id(host));
+    keys.sort_by(|a, b| a.id(host).cmp(&b.id(host)));
     for item in &keys {
-        let id = item.id(host);
+        let id = item.id(host).unwrap_or_default();
         let burn = if id == "ironfurnaces:rainbow_coal" { 200 } else { host.item_burn_time(*item).unwrap_or(0) };
         if burn > 0 {
             out.push(card("ironfurnaces:generator_regular", &id, &[(&id, 1)], i64::from(burn) * 20));
@@ -72,7 +72,7 @@ fn recipes(host: &dyn Host) -> Vec<(String, jei::api::RecipeDef)> {
         if let Some(Tag::Compound(food)) = host.item_default_component(*item, "minecraft:food") {
             let nutrition = get_i(&food, "nutrition", 0);
             if nutrition > 0 {
-                let id = item.id(host);
+                let id = item.id(host).unwrap_or_default();
                 out.push(card("ironfurnaces:generator_smoking", &id, &[(&id, 1)], i64::from(nutrition) * 800 * 40));
             }
         }

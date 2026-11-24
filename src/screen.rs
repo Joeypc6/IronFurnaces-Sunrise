@@ -45,11 +45,29 @@ fn page_of(host: &dyn Host, pos: Pos) -> Option<(bool, i32)> {
     Some((get_i(&data, "AugmentGUI", 0) != 0, get_i(&data, "hz_mode", 0)))
 }
 
+/// The client's screen for one opening of a furnace's or the transmitter's menu (`register_menu_screen`): the layout
+/// for the block it opened on, drawn, clicked and hovered from the menu's live data.
+pub(crate) fn create(host: &dyn ClientHost, open: MenuScreenOpen<'_>) -> Option<MenuScreen> {
+    let block = open.block?.to_owned();
+    let screen = MenuScreen::new(layout(host, &block, open.pos)?);
+    let (on_draw, on_click, on_tooltip) = (block.clone(), block.clone(), block);
+    Some(
+        screen
+            .with_draw(move |host, frame, ctx| draw(host, &on_draw, frame.data, ctx, frame.origin))
+            .with_click(move |host, frame, right| click(host, &on_click, frame.data, frame.at, right))
+            .with_tooltip(move |host, frame, _slot, lines| {
+                let mut own = Vec::new();
+                tooltip(host, &on_tooltip, frame.data, frame.at, &mut own);
+                lines.extend(own.into_iter().map(|l| (Text::literal(l), u32::MAX)));
+            }),
+    )
+}
+
 /// The screen's layout: its size, and where each slot of the page shown sits. A slot the page doesn't show has no
 /// place, so it is neither drawn nor clicked, and the server's menu leaves it out too (`native_hidden_slots`).
-pub(crate) fn layout(host: &dyn Host, block: &str) -> Option<Screen> {
+pub(crate) fn layout(host: &dyn Host, block: &str, pos: Option<Pos>) -> Option<MenuScreenLayout> {
     if is_heater(block) {
-        return Some(Screen {
+        return Some(MenuScreenLayout {
             width: 176.0,
             height: 166.0,
             // BlockWirelessEnergyHeaterContainer: SlotHeater(te, 0, 80, 37).
@@ -58,16 +76,18 @@ pub(crate) fn layout(host: &dyn Host, block: &str) -> Option<Screen> {
             inventory_x: 8.0,
             own_labels: true,
             own_background: true,
-            ..Screen::default()
+            ..MenuScreenLayout::default()
         });
     }
     if !is_furnace(block) {
         return None;
     }
-    let (augment_page, mode) = with_state(|s| s.layout_pos).and_then(|pos| page_of(host, pos)).unwrap_or((false, 0));
+    // The block the menu opened on, or, when the opening names none, the one last clicked.
+    let pos = pos.or_else(|| with_state(|s| s.layout_pos));
+    let (augment_page, mode) = pos.and_then(|pos| page_of(host, pos)).unwrap_or((false, 0));
     let tier = config::tier(host, block);
     let slots = (0..SLOTS).map(|i| slot_shown(augment_page, mode, tier, i).then_some(slot_at(AT[i]))).collect();
-    Some(Screen {
+    Some(MenuScreenLayout {
         width: 176.0,
         height: 166.0,
         slots,
@@ -75,7 +95,7 @@ pub(crate) fn layout(host: &dyn Host, block: &str) -> Option<Screen> {
         inventory_x: 8.0,
         own_labels: true,
         own_background: true,
-        ..Screen::default()
+        ..MenuScreenLayout::default()
     })
 }
 
@@ -500,7 +520,7 @@ pub(crate) fn tooltip(host: &dyn ClientHost, block: &str, data: &[i32], at: [f32
 /// PacketRedstoneFurnaceSetting and PacketFurnaceSettings. Only the button ids the screen sends are taken.
 pub(crate) fn menu_button(host: &mut dyn ServerHost, player: u128, pos: Pos, id: i32, nbt: &mut Compound) {
     let Some(level) = host.player(player).and_then(|p| p.level(host)) else { return };
-    let Some(block) = level.block(host, pos).map(|b| b.id(host)) else { return };
+    let Some(block) = level.block(host, pos).and_then(|b| b.id(host).map(str::to_owned)) else { return };
     if !is_furnace(&block) {
         return;
     }

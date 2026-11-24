@@ -315,7 +315,7 @@ fn pull_into(
         }
         let want = room.min(available);
         let got = host
-            .transaction(|host, tx| Ok::<u32, ()>(other.extract(host, tx, i, &resource, want)))
+            .transaction(|host, tx| other.extract_at(host, tx, i, &resource, want))
             .unwrap_or(0);
         if got == 0 {
             continue;
@@ -336,7 +336,7 @@ fn push_from(host: &mut dyn ServerHost, level: LevelRef, e: &mut Fields, pos: Po
     let Some(other) = level.capability(host, &ITEMS, there, Some(DIRECTIONS[opposite(dir)])) else { return };
     let resource = ItemResource::of(&stack);
     let went = host
-        .transaction(|host, tx| Ok::<u32, ()>(other.insert_any(host, tx, &resource, stack.count())))
+        .transaction(|host, tx| Ok::<u32, ()>(other.insert(host, tx, &resource, stack.count()).unwrap_or(0)))
         .unwrap_or(0)
         .min(stack.count());
     shrink(&mut e.items[slot], went);
@@ -429,7 +429,7 @@ fn energy_to(host: &mut dyn ServerHost, level: LevelRef, pos: Pos, dir: usize, a
         return 0;
     }
     let Some(other) = level.capability(host, &ENERGY, offset(pos, dir), Some(DIRECTIONS[opposite(dir)])) else { return 0 };
-    host.transaction(|host, tx| Ok::<u32, ()>(other.insert(host, tx, amount as u32)))
+    host.transaction(|host, tx| other.insert(host, tx, amount as u32))
         .unwrap_or(0)
         .min(amount as u32) as i32
 }
@@ -608,7 +608,7 @@ fn consume_fuel(host: &mut dyn ServerHost, level: LevelRef, e: &mut Fields, tota
     let fuel_id = id_of(host, &fuel);
     if is_heater_item(&fuel_id) {
         let Some(bound) = heater_position(&fuel) else { return 0 };
-        let Some(heater) = level.block(host, bound).filter(|b| is_heater(&b.id(host))).and_then(|_| host.block_entity(level, bound)) else {
+        let Some(heater) = level.block(host, bound).filter(|b| b.id(host).is_some_and(is_heater)).and_then(|_| host.block_entity(level, bound)) else {
             return 0;
         };
         let stored = heater.data(host).map_or(0, |d| get_i(&d, "energy", 0));
@@ -852,7 +852,7 @@ fn rainbow_tick(host: &mut dyn ServerHost, level: LevelRef, pos: Pos, e: &mut Fi
                 rainbow_generators += 1;
                 continue;
             }
-            let Some(id) = level.block(host, p).map(|b| b.id(host)) else { continue };
+            let Some(id) = level.block(host, p).and_then(|b| b.id(host).map(str::to_owned)) else { continue };
             if !is_furnace(&id) {
                 continue;
             }
